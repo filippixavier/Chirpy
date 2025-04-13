@@ -22,9 +22,9 @@ func main() {
 	)
 	serveMux.HandleFunc("GET /api/healthz", healthz)
 
-	serveMux.HandleFunc("GET /api/metrics", apiCfg.metrics)
+	serveMux.HandleFunc("POST /admin/reset", apiCfg.reset)
 
-	serveMux.HandleFunc("POST /api/reset", apiCfg.reset)
+	serveMux.HandleFunc("GET /admin/metrics", apiCfg.metrics)
 
 	server := &http.Server{
 		Addr:    ":" + port,
