@@ -20,11 +20,11 @@ func main() {
 			http.FileServer(http.Dir(filepathRoot)),
 		)),
 	)
-	serveMux.HandleFunc("/healthz", healthz)
+	serveMux.HandleFunc("GET /healthz", healthz)
 
-	serveMux.HandleFunc("/metrics", apiCfg.metrics)
+	serveMux.HandleFunc("GET /metrics", apiCfg.metrics)
 
-	serveMux.HandleFunc("/reset", apiCfg.reset)
+	serveMux.HandleFunc("POST /reset", apiCfg.reset)
 
 	server := &http.Server{
 		Addr:    ":" + port,
