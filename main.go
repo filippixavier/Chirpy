@@ -1,17 +1,31 @@
 package main
 
 import (
+	"database/sql"
 	"log"
 	"net/http"
+	"os"
 	"sync/atomic"
+
+	"github.com/filippixavier/Chirpy/internal/database"
+	_ "github.com/lib/pq"
 )
 
 func main() {
+	dbURL := os.Getenv("DB_URL")
+
 	const filepathRoot = "."
 	const port = "8080"
 
+	db, err := sql.Open("postgres", dbURL)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	apiCfg := &apiConfig{
 		fileserverHits: atomic.Int32{},
+		db:             database.New(db),
 	}
 
 	serveMux := http.NewServeMux()
