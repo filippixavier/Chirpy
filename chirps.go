@@ -10,7 +10,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func (apiCfg *apiConfig) chirps(w http.ResponseWriter, r *http.Request) {
+func (apiCfg *apiConfig) create_chirp(w http.ResponseWriter, r *http.Request) {
 	type chirp struct {
 		Body   string    `json:"body"`
 		UserId uuid.UUID `json:"user_id"`
@@ -56,6 +56,35 @@ func (apiCfg *apiConfig) chirps(w http.ResponseWriter, r *http.Request) {
 	} else {
 		respondWithError(w, 400, "Chirp is too long", nil)
 	}
+}
+
+func (apiCfg *apiConfig) get_chirps(w http.ResponseWriter, r *http.Request) {
+	type response []struct {
+		ID        uuid.UUID `json:"id"`
+		CreatedAt time.Time `json:"created_at"`
+		UpdatedAt time.Time `json:"updated_at"`
+		Body      string    `json:"body"`
+		UserID    uuid.UUID `json:"user_id"`
+	}
+
+	chirps, err := apiCfg.db.GetChirps(r.Context())
+
+	if err != nil {
+		respondWithError(w, 500, "Unknown error", err)
+		return
+	}
+
+	chJson := make(response, len(chirps))
+
+	for i, ch := range chirps {
+		chJson[i].ID = ch.ID
+		chJson[i].CreatedAt = ch.CreatedAt
+		chJson[i].UpdatedAt = ch.UpdatedAt
+		chJson[i].Body = ch.Body
+		chJson[i].UserID = ch.UserID
+	}
+
+	respondWithJSON(w, 200, chJson)
 }
 
 func purge_bad_words(str string) string {
