@@ -8,10 +8,13 @@ import (
 	"sync/atomic"
 
 	"github.com/filippixavier/Chirpy/internal/database"
+	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 )
 
 func main() {
+	godotenv.Load()
+
 	dbURL := os.Getenv("DB_URL")
 
 	const filepathRoot = "."
@@ -36,7 +39,9 @@ func main() {
 	)
 	serveMux.HandleFunc("GET /api/healthz", healthz)
 
-	serveMux.HandleFunc("POST /api/validate_chirp", apiCfg.validate_chirp)
+	serveMux.HandleFunc("POST /api/users", apiCfg.create_user)
+
+	serveMux.HandleFunc("POST /api/chirps", apiCfg.chirps)
 
 	serveMux.HandleFunc("POST /admin/reset", apiCfg.reset)
 
