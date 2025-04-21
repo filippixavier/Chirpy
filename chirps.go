@@ -10,6 +10,14 @@ import (
 	"github.com/google/uuid"
 )
 
+type Chirp struct {
+	ID        uuid.UUID `json:"id"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	Body      string    `json:"body"`
+	UserID    uuid.UUID `json:"user_id"`
+}
+
 func (apiCfg *apiConfig) create_chirp(w http.ResponseWriter, r *http.Request) {
 	type chirp struct {
 		Body   string    `json:"body"`
@@ -59,14 +67,7 @@ func (apiCfg *apiConfig) create_chirp(w http.ResponseWriter, r *http.Request) {
 }
 
 func (apiCfg *apiConfig) get_chirps(w http.ResponseWriter, r *http.Request) {
-	type response []struct {
-		ID        uuid.UUID `json:"id"`
-		CreatedAt time.Time `json:"created_at"`
-		UpdatedAt time.Time `json:"updated_at"`
-		Body      string    `json:"body"`
-		UserID    uuid.UUID `json:"user_id"`
-	}
-
+	type response []Chirp
 	chirps, err := apiCfg.db.GetChirps(r.Context())
 
 	if err != nil {
@@ -85,6 +86,32 @@ func (apiCfg *apiConfig) get_chirps(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondWithJSON(w, 200, chJson)
+}
+
+func (apiCfg *apiConfig) get_chirp_by_id(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("chirpID")
+
+	uid, err := uuid.Parse(id)
+
+	if err != nil {
+		respondWithError(w, 404, "chirp not found", err)
+		return
+	}
+
+	chirp, err := apiCfg.db.GetChirpById(r.Context(), uid)
+
+	if err != nil {
+		respondWithError(w, 404, "chirp not found", err)
+		return
+	}
+
+	respondWithJSON(w, 200, Chirp{
+		ID:        chirp.ID,
+		CreatedAt: chirp.CreatedAt,
+		UpdatedAt: chirp.UpdatedAt,
+		Body:      chirp.Body,
+		UserID:    chirp.UserID,
+	})
 }
 
 func purge_bad_words(str string) string {
