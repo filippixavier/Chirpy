@@ -7,73 +7,105 @@ import (
 	"github.com/google/uuid"
 )
 
-func TestAuth(t *testing.T) {
-	// cases := []struct {
-	// 	input    string
-	// 	expected []string
-	// }{
-	// 	{
-	// 		input:    "  hello  world  ",
-	// 		expected: []string{"hello", "world"},
-	// 	},
-	// 	{
-	// 		input:    " this is     sparta !",
-	// 		expected: []string{"this", "is", "sparta", "!"},
-	// 	},
-	// 	{
-	// 		input:    "  hello  ",
-	// 		expected: []string{"hello"},
-	// 	},
-	// 	{
-	// 		input:    "  hello  world  ",
-	// 		expected: []string{"hello", "world"},
-	// 	},
-	// 	{
-	// 		input:    "  HellO  World  ",
-	// 		expected: []string{"hello", "world"},
-	// 	},
-	// }
+func TestCheckPasswordHash(t *testing.T) {
+	// First, we need to create some hashed passwords for testing
+	password1 := "correctPassword123!"
+	password2 := "anotherPassword456!"
+	hash1, _ := HashPassword(password1)
+	hash2, _ := HashPassword(password2)
 
-	// for _, c := range cases {
-	// 	actual := cleanInput(c.input)
-	// 	// Check the length of the actual slice against the expected slice
-	// 	// if they don't match, use t.Errorf to print an error message
-	// 	// and fail the test
-	// 	if len(actual) != len(c.expected) {
-	// 		t.Errorf("Expected %v, got %v", c.expected, actual)
-	// 	}
-	// 	for i := range actual {
-	// 		word := actual[i]
-	// 		expectedWord := c.expected[i]
-	// 		// Check each word in the slice
-	// 		// if they don't match, use t.Errorf to print an error message
-	// 		// and fail the test
-	// 		if word != expectedWord {
-	// 			t.Errorf("%v is not the same as expected %v", word, expectedWord)
-	// 		}
-	// 	}
-	// }
+	tests := []struct {
+		name     string
+		password string
+		hash     string
+		wantErr  bool
+	}{
+		{
+			name:     "Correct password",
+			password: password1,
+			hash:     hash1,
+			wantErr:  false,
+		},
+		{
+			name:     "Incorrect password",
+			password: "wrongPassword",
+			hash:     hash1,
+			wantErr:  true,
+		},
+		{
+			name:     "Password doesn't match different hash",
+			password: password1,
+			hash:     hash2,
+			wantErr:  true,
+		},
+		{
+			name:     "Empty password",
+			password: "",
+			hash:     hash1,
+			wantErr:  true,
+		},
+		{
+			name:     "Invalid hash",
+			password: password1,
+			hash:     "invalidhash",
+			wantErr:  true,
+		},
+	}
 
-	t.Run("Test case", func(t *testing.T) {
-		id := uuid.New()
-		token, err := MakeJWT(id, "secretoken", 30*time.Minute)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := CheckPasswordHash(tt.hash, tt.password)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("CheckPasswordHash() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
 
-		if err != nil {
-			t.Error(err)
-			return
-		}
+func TestValidateJWT(t *testing.T) {
+	userID := uuid.New()
+	validToken, _ := MakeJWT(userID, "secret", time.Hour)
 
-		dcoded, err := ValidateJWT(token, "secretoken")
+	tests := []struct {
+		name        string
+		tokenString string
+		tokenSecret string
+		wantUserID  uuid.UUID
+		wantErr     bool
+	}{
+		{
+			name:        "Valid token",
+			tokenString: validToken,
+			tokenSecret: "secret",
+			wantUserID:  userID,
+			wantErr:     false,
+		},
+		{
+			name:        "Invalid token",
+			tokenString: "invalid.token.string",
+			tokenSecret: "secret",
+			wantUserID:  uuid.Nil,
+			wantErr:     true,
+		},
+		{
+			name:        "Wrong secret",
+			tokenString: validToken,
+			tokenSecret: "wrong_secret",
+			wantUserID:  uuid.Nil,
+			wantErr:     true,
+		},
+	}
 
-		if err != nil {
-			t.Error(err)
-			return
-		}
-
-		if dcoded != id {
-			t.Errorf("original id and decoded one does not match")
-		}
-
-	})
-
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotUserID, err := ValidateJWT(tt.tokenString, tt.tokenSecret)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidateJWT() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if gotUserID != tt.wantUserID {
+				t.Errorf("ValidateJWT() gotUserID = %v, want %v", gotUserID, tt.wantUserID)
+			}
+		})
+	}
 }
