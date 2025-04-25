@@ -16,6 +16,7 @@ func main() {
 	godotenv.Load()
 
 	dbURL := os.Getenv("DB_URL")
+	secret := os.Getenv("SECRET")
 
 	const filepathRoot = "."
 	const port = "8080"
@@ -29,6 +30,7 @@ func main() {
 	apiCfg := &apiConfig{
 		fileserverHits: atomic.Int32{},
 		db:             database.New(db),
+		secret:         secret,
 	}
 
 	serveMux := http.NewServeMux()

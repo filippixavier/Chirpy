@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"time"
 
+	"github.com/filippixavier/Chirpy/internal/auth"
 	"github.com/filippixavier/Chirpy/internal/database"
 	"github.com/google/uuid"
 )
@@ -20,8 +21,7 @@ type Chirp struct {
 
 func (apiCfg *apiConfig) create_chirp(w http.ResponseWriter, r *http.Request) {
 	type chirp struct {
-		Body   string    `json:"body"`
-		UserId uuid.UUID `json:"user_id"`
+		Body string `json:"body"`
 	}
 
 	type response struct {
@@ -34,6 +34,17 @@ func (apiCfg *apiConfig) create_chirp(w http.ResponseWriter, r *http.Request) {
 
 	var ch chirp
 
+	token, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		respondWithError(w, 401, "unauthorized access", err)
+	}
+
+	usr, err := auth.ValidateJWT(token, apiCfg.secret)
+
+	if err != nil {
+		respondWithError(w, 401, "unauthorized access", err)
+	}
+
 	w.Header().Add("Content-Type", "application/json")
 
 	defer r.Body.Close()
@@ -45,11 +56,11 @@ func (apiCfg *apiConfig) create_chirp(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(ch.Body) < 140 {
-		if _, err := apiCfg.db.GetUserById(r.Context(), ch.UserId); err != nil {
+		if _, err := apiCfg.db.GetUserById(r.Context(), usr); err != nil {
 			respondWithError(w, 500, "Unknown user", err)
 			return
 		}
-		chdb, err := apiCfg.db.CreateChirp(r.Context(), database.CreateChirpParams{Body: purge_bad_words(ch.Body), UserID: ch.UserId})
+		chdb, err := apiCfg.db.CreateChirp(r.Context(), database.CreateChirpParams{Body: purge_bad_words(ch.Body), UserID: usr})
 		if err != nil {
 			respondWithError(w, 500, "Error when inserting chirp in db", err)
 		}
@@ -58,7 +69,7 @@ func (apiCfg *apiConfig) create_chirp(w http.ResponseWriter, r *http.Request) {
 			CreatedAt: chdb.CreatedAt,
 			UpdatedAt: chdb.UpdatedAt,
 			Body:      chdb.Body,
-			UserId:    ch.UserId,
+			UserId:    usr,
 		}
 		respondWithJSON(w, 201, res)
 	} else {
