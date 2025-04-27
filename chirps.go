@@ -37,12 +37,14 @@ func (apiCfg *apiConfig) create_chirp(w http.ResponseWriter, r *http.Request) {
 	token, err := auth.GetBearerToken(r.Header)
 	if err != nil {
 		respondWithError(w, 401, "unauthorized access", err)
+		return
 	}
 
 	usr, err := auth.ValidateJWT(token, apiCfg.secret)
 
 	if err != nil {
 		respondWithError(w, 401, "unauthorized access", err)
+		return
 	}
 
 	w.Header().Add("Content-Type", "application/json")
@@ -63,6 +65,7 @@ func (apiCfg *apiConfig) create_chirp(w http.ResponseWriter, r *http.Request) {
 		chdb, err := apiCfg.db.CreateChirp(r.Context(), database.CreateChirpParams{Body: purge_bad_words(ch.Body), UserID: usr})
 		if err != nil {
 			respondWithError(w, 500, "Error when inserting chirp in db", err)
+			return
 		}
 		res := response{
 			Id:        chdb.ID,

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"time"
@@ -11,17 +12,17 @@ import (
 )
 
 type userRequest struct {
-	Email            string `json:"email"`
-	Password         string `json:"password"`
-	ExpiresInSeconds *int   `json:"expires_in_seconds,omitempty"`
+	Email    string `json:"email"`
+	Password string `json:"password"`
 }
 
 type userResponse struct {
-	Id        uuid.UUID `json:"id"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-	Email     string    `json:"email"`
-	Token     string    `json:"token"`
+	Id           uuid.UUID `json:"id"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+	Email        string    `json:"email"`
+	Token        string    `json:"token,omitempty"`
+	RefreshToken string    `json:"refresh_token,omitempty"`
 }
 
 func (apiCfg *apiConfig) create_user(w http.ResponseWriter, r *http.Request) {
@@ -44,6 +45,7 @@ func (apiCfg *apiConfig) create_user(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		respondWithError(w, 500, "error when hashing password", err)
+		return
 	}
 
 	usr, err := apiCfg.db.CreateUser(ctx, database.CreateUserParams{Email: usrJson.Email, HashedPassword: hpwd})
@@ -68,15 +70,10 @@ func (apiCfg *apiConfig) login_user(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
 	decoder := json.NewDecoder(r.Body)
-	hour := 3600
 
 	if err := decoder.Decode(&usrJson); err != nil {
 		respondWithError(w, 500, "error when decoding json", err)
 		return
-	}
-
-	if usrJson.ExpiresInSeconds == nil || *usrJson.ExpiresInSeconds > hour {
-		usrJson.ExpiresInSeconds = &hour
 	}
 
 	usr, err := apiCfg.db.GetUserByEmail(r.Context(), usrJson.Email)
@@ -93,19 +90,86 @@ func (apiCfg *apiConfig) login_user(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := auth.MakeJWT(usr.ID, apiCfg.secret, time.Second*time.Duration(*usrJson.ExpiresInSeconds))
+	token, err := auth.MakeJWT(usr.ID, apiCfg.secret, time.Hour)
 
 	if err != nil {
 		respondWithError(w, 500, "error when creating token", err)
+		return
+	}
+
+	refresh, _ := auth.MakeRefreshToken()
+
+	rtk, err := apiCfg.db.MakeRefreshToken(r.Context(), database.MakeRefreshTokenParams{
+		Token:     refresh,
+		UserID:    usr.ID,
+		ExpiresAt: time.Now().AddDate(0, 0, 60),
+	})
+
+	if err != nil {
+		respondWithError(w, 500, "error when creating refresh token", err)
+		return
 	}
 
 	usrRes := userResponse{
-		Id:        usr.ID,
-		CreatedAt: usr.CreatedAt,
-		UpdatedAt: usr.UpdatedAt,
-		Email:     usr.Email,
-		Token:     token,
+		Id:           usr.ID,
+		CreatedAt:    usr.CreatedAt,
+		UpdatedAt:    usr.UpdatedAt,
+		Email:        usr.Email,
+		Token:        token,
+		RefreshToken: rtk.Token,
 	}
 
 	respondWithJSON(w, 200, usrRes)
+}
+
+func (apiCfg *apiConfig) refresh_token(w http.ResponseWriter, r *http.Request) {
+	token, err := auth.GetBearerToken(r.Header)
+
+	if err != nil {
+		respondWithError(w, 401, "token not found", err)
+		return
+	}
+
+	rtk, err := apiCfg.db.GetRefreshToken(r.Context(), token)
+
+	if err != nil || rtk.RevokedAt.Valid || rtk.ExpiresAt.Before(time.Now()) {
+		respondWithError(w, 401, "token not found or revoked", err)
+		return
+	}
+
+	tk, err := auth.MakeJWT(rtk.UserID, apiCfg.secret, time.Hour)
+
+	if err != nil {
+		respondWithError(w, 500, "error when creating token", err)
+		return
+	}
+
+	type response struct {
+		Token string `json:"token"`
+	}
+
+	respondWithJSON(w, 200, response{Token: tk})
+}
+
+func (apiCfg *apiConfig) revoke_token(w http.ResponseWriter, r *http.Request) {
+	refresh, err := auth.GetBearerToken(r.Header)
+
+	if err != nil {
+		respondWithError(w, 400, "no token found", err)
+		return
+	}
+
+	rtk, err := apiCfg.db.GetRefreshToken(r.Context(), refresh)
+
+	if err != nil {
+		respondWithError(w, 400, "token not found", err)
+		return
+	}
+
+	apiCfg.db.RevokeRefrehToken(r.Context(), database.RevokeRefrehTokenParams{
+		Token:     rtk.Token,
+		RevokedAt: sql.NullTime{Time: time.Now(), Valid: true},
+	})
+
+	w.WriteHeader(204)
 }
