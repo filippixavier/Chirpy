@@ -1,7 +1,6 @@
 package main
 
 import (
-	"database/sql"
 	"encoding/json"
 	"net/http"
 	"time"
@@ -32,14 +31,13 @@ func (apiCfg *apiConfig) create_user(w http.ResponseWriter, r *http.Request) {
 	var usrJson userRequest
 	ctx := r.Context()
 
-	defer r.Body.Close()
-
 	decoder := json.NewDecoder(r.Body)
 
 	if err := decoder.Decode(&usrJson); err != nil {
 		respondWithError(w, 500, "error when decoding json", err)
 		return
 	}
+	defer r.Body.Close()
 
 	hpwd, err := auth.HashPassword(usrJson.Password)
 
@@ -67,7 +65,6 @@ func (apiCfg *apiConfig) create_user(w http.ResponseWriter, r *http.Request) {
 
 func (apiCfg *apiConfig) login_user(w http.ResponseWriter, r *http.Request) {
 	var usrJson userRequest
-	defer r.Body.Close()
 
 	decoder := json.NewDecoder(r.Body)
 
@@ -75,6 +72,7 @@ func (apiCfg *apiConfig) login_user(w http.ResponseWriter, r *http.Request) {
 		respondWithError(w, 500, "error when decoding json", err)
 		return
 	}
+	defer r.Body.Close()
 
 	usr, err := apiCfg.db.GetUserByEmail(r.Context(), usrJson.Email)
 
@@ -112,9 +110,9 @@ func (apiCfg *apiConfig) login_user(w http.ResponseWriter, r *http.Request) {
 
 	usrRes := userResponse{
 		Id:           usr.ID,
+		Email:        usr.Email,
 		CreatedAt:    usr.CreatedAt,
 		UpdatedAt:    usr.UpdatedAt,
-		Email:        usr.Email,
 		Token:        token,
 		RefreshToken: rtk.Token,
 	}
@@ -122,54 +120,61 @@ func (apiCfg *apiConfig) login_user(w http.ResponseWriter, r *http.Request) {
 	respondWithJSON(w, 200, usrRes)
 }
 
-func (apiCfg *apiConfig) refresh_token(w http.ResponseWriter, r *http.Request) {
+func (apiCfg *apiConfig) update_user(w http.ResponseWriter, r *http.Request) {
+	type request struct {
+		Password string `json:"password"`
+		Email    string `json:"email"`
+	}
+
+	var body request
+
 	token, err := auth.GetBearerToken(r.Header)
 
 	if err != nil {
-		respondWithError(w, 401, "token not found", err)
+		respondWithError(w, 401, "missing auth token", err)
 		return
 	}
 
-	rtk, err := apiCfg.db.GetRefreshToken(r.Context(), token)
-
-	if err != nil || rtk.RevokedAt.Valid || rtk.ExpiresAt.Before(time.Now()) {
-		respondWithError(w, 401, "token not found or revoked", err)
-		return
-	}
-
-	tk, err := auth.MakeJWT(rtk.UserID, apiCfg.secret, time.Hour)
+	id, err := auth.ValidateJWT(token, apiCfg.secret)
 
 	if err != nil {
-		respondWithError(w, 500, "error when creating token", err)
+		respondWithError(w, 401, "invalid auth token", err)
 		return
 	}
 
-	type response struct {
-		Token string `json:"token"`
-	}
+	decode := json.NewDecoder(r.Body)
 
-	respondWithJSON(w, 200, response{Token: tk})
-}
-
-func (apiCfg *apiConfig) revoke_token(w http.ResponseWriter, r *http.Request) {
-	refresh, err := auth.GetBearerToken(r.Header)
+	err = decode.Decode(&body)
 
 	if err != nil {
-		respondWithError(w, 400, "no token found", err)
+		respondWithError(w, 500, "error when reading body", err)
 		return
 	}
 
-	rtk, err := apiCfg.db.GetRefreshToken(r.Context(), refresh)
+	defer r.Body.Close()
+
+	hpassword, err := auth.HashPassword(body.Password)
 
 	if err != nil {
-		respondWithError(w, 400, "token not found", err)
+		respondWithError(w, 500, "error hashing password", err)
 		return
 	}
 
-	apiCfg.db.RevokeRefrehToken(r.Context(), database.RevokeRefrehTokenParams{
-		Token:     rtk.Token,
-		RevokedAt: sql.NullTime{Time: time.Now(), Valid: true},
+	usr, err := apiCfg.db.UpdateUser(r.Context(), database.UpdateUserParams{
+		ID:             id,
+		Email:          body.Email,
+		HashedPassword: hpassword,
 	})
 
-	w.WriteHeader(204)
+	if err != nil {
+		respondWithError(w, 500, "error when updating user", err)
+		return
+	}
+
+	respondWithJSON(w, 200, userResponse{
+		Id:        usr.ID,
+		CreatedAt: usr.CreatedAt,
+		UpdatedAt: usr.UpdatedAt,
+		Email:     usr.Email,
+	})
 }

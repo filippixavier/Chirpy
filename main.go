@@ -46,6 +46,7 @@ func main() {
 	serveMux.HandleFunc("POST /api/revoke", apiCfg.revoke_token)
 
 	serveMux.HandleFunc("POST /api/users", apiCfg.create_user)
+	serveMux.HandleFunc("PUT /api/users", apiCfg.update_user)
 
 	serveMux.HandleFunc("GET /api/chirps", apiCfg.get_chirps)
 	serveMux.HandleFunc("GET /api/chirps/{chirpID}", apiCfg.get_chirp_by_id)
