@@ -17,6 +17,7 @@ type userRequest struct {
 
 type userResponse struct {
 	Id           uuid.UUID `json:"id"`
+	IsChirpyRed  bool      `json:"is_chirpy_red"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 	Email        string    `json:"email"`
@@ -54,10 +55,11 @@ func (apiCfg *apiConfig) create_user(w http.ResponseWriter, r *http.Request) {
 	}
 
 	usrRes := userResponse{
-		Id:        usr.ID,
-		CreatedAt: usr.CreatedAt,
-		UpdatedAt: usr.UpdatedAt,
-		Email:     usr.Email,
+		Id:          usr.ID,
+		Email:       usr.Email,
+		IsChirpyRed: usr.IsChirpyRed,
+		CreatedAt:   usr.CreatedAt,
+		UpdatedAt:   usr.UpdatedAt,
 	}
 
 	respondWithJSON(w, 201, usrRes)
@@ -111,6 +113,7 @@ func (apiCfg *apiConfig) login_user(w http.ResponseWriter, r *http.Request) {
 	usrRes := userResponse{
 		Id:           usr.ID,
 		Email:        usr.Email,
+		IsChirpyRed:  usr.IsChirpyRed,
 		CreatedAt:    usr.CreatedAt,
 		UpdatedAt:    usr.UpdatedAt,
 		Token:        token,
@@ -172,9 +175,10 @@ func (apiCfg *apiConfig) update_user(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondWithJSON(w, 200, userResponse{
-		Id:        usr.ID,
-		CreatedAt: usr.CreatedAt,
-		UpdatedAt: usr.UpdatedAt,
-		Email:     usr.Email,
+		Id:          usr.ID,
+		IsChirpyRed: usr.IsChirpyRed,
+		CreatedAt:   usr.CreatedAt,
+		UpdatedAt:   usr.UpdatedAt,
+		Email:       usr.Email,
 	})
 }
