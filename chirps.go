@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"regexp"
+	"slices"
 	"time"
 
 	"github.com/filippixavier/Chirpy/internal/auth"
@@ -129,6 +130,7 @@ func (apiCfg *apiConfig) get_chirps(w http.ResponseWriter, r *http.Request) {
 	var err error
 
 	usr := r.URL.Query().Get("author_id")
+	ord := r.URL.Query().Get("sort")
 
 	if usr == "" {
 		chirps, err = apiCfg.db.GetChirps(r.Context())
@@ -158,6 +160,12 @@ func (apiCfg *apiConfig) get_chirps(w http.ResponseWriter, r *http.Request) {
 		chJson[i].UpdatedAt = ch.UpdatedAt
 		chJson[i].Body = ch.Body
 		chJson[i].UserID = ch.UserID
+	}
+
+	if ord == "desc" {
+		slices.SortFunc(chJson, func(a, b Chirp) int {
+			return b.CreatedAt.Compare(a.CreatedAt)
+		})
 	}
 
 	respondWithJSON(w, 200, chJson)
