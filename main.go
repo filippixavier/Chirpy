@@ -50,6 +50,7 @@ func main() {
 
 	serveMux.HandleFunc("GET /api/chirps", apiCfg.get_chirps)
 	serveMux.HandleFunc("GET /api/chirps/{chirpID}", apiCfg.get_chirp_by_id)
+	serveMux.HandleFunc("DELETE /api/chirps/{chirpID}", apiCfg.delete_chirp)
 	serveMux.HandleFunc("POST /api/chirps", apiCfg.create_chirp)
 
 	serveMux.HandleFunc("POST /admin/reset", apiCfg.reset)

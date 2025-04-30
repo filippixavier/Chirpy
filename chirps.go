@@ -80,6 +80,48 @@ func (apiCfg *apiConfig) create_chirp(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (apiCfg *apiConfig) delete_chirp(w http.ResponseWriter, r *http.Request) {
+	tkn, err := auth.GetBearerToken(r.Header)
+	chipPath := r.PathValue("chirpID")
+
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "no token found", err)
+		return
+	}
+
+	usrId, err := auth.ValidateJWT(tkn, apiCfg.secret)
+
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "invalid token", err)
+		return
+	}
+
+	chirpID, err := uuid.Parse(chipPath)
+
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "invalid chirp id", err)
+		return
+	}
+	chirp, err := apiCfg.db.GetChirpById(r.Context(), chirpID)
+
+	if err != nil {
+		respondWithError(w, http.StatusNotFound, "chirp not found", err)
+		return
+	}
+
+	if chirp.UserID != usrId {
+		respondWithError(w, http.StatusForbidden, "not the owner of chirp", err)
+		return
+	}
+
+	if _, err := apiCfg.db.DeleteChirp(r.Context(), chirpID); err != nil {
+		respondWithError(w, http.StatusInternalServerError, "error when deleting chirp", err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (apiCfg *apiConfig) get_chirps(w http.ResponseWriter, r *http.Request) {
 	type response []Chirp
 	chirps, err := apiCfg.db.GetChirps(r.Context())
