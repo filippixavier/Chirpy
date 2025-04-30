@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/filippixavier/Chirpy/internal/auth"
 	"github.com/filippixavier/Chirpy/internal/database"
 	"github.com/google/uuid"
 )
@@ -21,6 +22,13 @@ func (apiCfg *apiConfig) polkaWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req request
+
+	key, err := auth.GetApiKey(r.Header)
+
+	if err != nil || key != apiCfg.apiKey {
+		respondWithError(w, http.StatusUnauthorized, "missing or invalid api key", err)
+		return
+	}
 
 	decoder := json.NewDecoder(r.Body)
 

@@ -17,6 +17,7 @@ func main() {
 
 	dbURL := os.Getenv("DB_URL")
 	secret := os.Getenv("SECRET")
+	apiKey := os.Getenv("POLKA_KEY")
 
 	const filepathRoot = "."
 	const port = "8080"
@@ -31,6 +32,7 @@ func main() {
 		fileserverHits: atomic.Int32{},
 		db:             database.New(db),
 		secret:         secret,
+		apiKey:         apiKey,
 	}
 
 	serveMux := http.NewServeMux()
