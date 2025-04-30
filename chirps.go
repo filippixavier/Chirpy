@@ -124,11 +124,30 @@ func (apiCfg *apiConfig) delete_chirp(w http.ResponseWriter, r *http.Request) {
 
 func (apiCfg *apiConfig) get_chirps(w http.ResponseWriter, r *http.Request) {
 	type response []Chirp
-	chirps, err := apiCfg.db.GetChirps(r.Context())
 
-	if err != nil {
-		respondWithError(w, 500, "Unknown error", err)
-		return
+	var chirps []database.Chirp
+	var err error
+
+	usr := r.URL.Query().Get("author_id")
+
+	if usr == "" {
+		chirps, err = apiCfg.db.GetChirps(r.Context())
+		if err != nil {
+			respondWithError(w, 500, "Unknown error", err)
+			return
+		}
+	} else {
+		usrId, err := uuid.Parse(usr)
+		if err != nil {
+			respondWithError(w, http.StatusNotFound, "invalid author id", err)
+			return
+		}
+		chirps, err = apiCfg.db.GetChirpsByAuthor(r.Context(), usrId)
+
+		if err != nil {
+			respondWithError(w, http.StatusInternalServerError, "error when fetching result", err)
+			return
+		}
 	}
 
 	chJson := make(response, len(chirps))
